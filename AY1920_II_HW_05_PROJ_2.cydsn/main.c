@@ -185,11 +185,15 @@ int main(void)
         UART_Debug_PutString("Error occurred during I2C comm to read status register\r\n");   
     }
     
+   int16_t OutX,OutY,OutZ;
+    uint8_t header = 0xA0;
+    uint8_t footer = 0xC0;
+    uint8_t OutArray[8]; 
     
-    int16_t OutX,OutY,OutZ;
-     
     uint8_t XData[2],YData[2],ZData[2];
-    
+   
+    OutArray[0] = header;
+    OutArray[7] = footer;
     
     for(;;)
     {
@@ -212,6 +216,26 @@ int main(void)
         
         
         
+        if(error == NO_ERROR)
+        {
+            OutX = (int16)((XData[0] | (XData[1]<<8)))>>6;
+            OutX = OutX*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
+            OutArray[1] = (uint8_t)(OutX & 0xFF);
+            OutArray[2] = (uint8_t)(OutX >> 8);
+            
+            OutY = (int16)((YData[0] | (YData[1]<<8)))>>6;
+            OutY = OutY*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
+            OutArray[3] = (uint8_t)(OutY & 0xFF);
+            OutArray[4] = (uint8_t)(OutY >> 8);
+            
+            OutZ = (int16)((ZData[0] | (ZData[1]<<8)))>>6;
+            OutZ = OutZ*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
+            OutArray[5] = (uint8_t)(OutZ & 0xFF);
+            OutArray[6] = (uint8_t)(OutZ >> 8);
+          
+            UART_Debug_PutArray(OutArray, 8);
+            
+        }
     }
 }
 
