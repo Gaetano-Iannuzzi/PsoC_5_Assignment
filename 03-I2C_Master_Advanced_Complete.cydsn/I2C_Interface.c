@@ -132,7 +132,7 @@
                                             uint8_t register_count,
                                             uint8_t* data)
     {
-        /// Send start condition
+        // Send start condition
         uint8_t error = I2C_Master_MasterSendStart(device_address, I2C_Master_WRITE_XFER_MODE);
         if (error == I2C_Master_MSTR_NO_ERROR)
         {
