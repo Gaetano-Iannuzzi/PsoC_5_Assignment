@@ -185,34 +185,33 @@ int main(void)
         UART_Debug_PutString("Error occurred during I2C comm to read status register\r\n");   
     }
     
-    /*
-    int16_t OutX,OutY,OutZ;
     
-    uint8_t header = 0xA0;
-    uint8_t footer = 0xC0;
-    uint8_t OutArray[4]; 
+    int16_t OutX,OutY,OutZ;
+     
     uint8_t XData[2],YData[2],ZData[2];
-    OutArray[0] = header;
-    OutArray[3] = footer;
-    */
+    
+    
     for(;;)
     {
-        CyDelay(100); 
-        /*
+        CyDelay(10); // we read data at 100 Hz (10ms of delay)
+        
         error = I2C_Peripheral_ReadRegisterMulti(LIS3DH_DEVICE_ADDRESS,
-                                                LIS3DH_OUT_ADC_3L,
+                                                LIS3DH_OUT_X_L,
                                                 2,
-                                                &TemperatureData[0]);
+                                                &XData[0]);
+        
+        error = I2C_Peripheral_ReadRegisterMulti(LIS3DH_DEVICE_ADDRESS,
+                                                LIS3DH_OUT_Y_L,
+                                                2,
+                                                &YData[0]);
+        
+        error = I2C_Peripheral_ReadRegisterMulti(LIS3DH_DEVICE_ADDRESS,
+                                                LIS3DH_OUT_Z_L,
+                                                2,
+                                                &ZData[0]);
         
         
-        if(error == NO_ERROR)
-        {
-            OutTemp = (int16)((TemperatureData[0] | (TemperatureData[1]<<8)))>>6;
-            OutArray[1] = (uint8_t)(OutTemp & 0xFF);
-            OutArray[2] = (uint8_t)(OutTemp >> 8);
-            UART_Debug_PutArray(OutArray, 4);
-        }
-        */
+        
     }
 }
 
