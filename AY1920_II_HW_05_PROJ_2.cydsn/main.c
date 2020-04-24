@@ -43,7 +43,7 @@
 #define LIS3DH_CTRL_REG4 0x23  
 
 // For the normal mode at 100 Hz and ±2.0 g FSR, Hex value is 0x00
-#define LIS3DH_NORMAL_MODE_100HZ_CTRL_REG4 0x00
+#define LIS3DH_NORMAL_MODE_100HZ_CTRL_REG4 0x80
 
 /**
 *   \brief Address of the X-axis acceleration data output LSB register
@@ -144,7 +144,7 @@ int main(void)
     /*            I2C Writing                 */
     /******************************************/
     
-        
+    // Write value of register CTRL_REG1
     UART_Debug_PutString("\r\nWriting new values..\r\n");
     
     if (ctrl_reg1 != LIS3DH_NORMAL_MODE_100HZ_CTRL_REG1)
@@ -165,6 +165,7 @@ int main(void)
             UART_Debug_PutString("Error occurred during I2C comm to set control register 1\r\n");   
         }
     }
+    // Write of register CTRL_REG4
     
     UART_Debug_PutString("\r\nWriting new values..\r\n");
     
@@ -186,110 +187,64 @@ int main(void)
             UART_Debug_PutString("Error occurred during I2C comm to set control register 1\r\n");   
         }
     }
-    /******************************************/
-    /*     Read Control Register 1 again      */
-    /******************************************/
 
-    error = I2C_Peripheral_ReadRegister(LIS3DH_DEVICE_ADDRESS,
-                                        LIS3DH_CTRL_REG1,
-                                        &ctrl_reg1);
-    
-    if (error == NO_ERROR)
-    {
-        sprintf(message, "CONTROL REGISTER 1 after overwrite operation: 0x%02X\r\n", ctrl_reg1);
-        UART_Debug_PutString(message); 
-    }
-    else
-    {
-        UART_Debug_PutString("Error occurred during I2C comm to read control register 1\r\n");   
-    }
-    
-     /******************************************/
-    /*     Read Control Register 4 again      */
-    /******************************************/
-
-    error = I2C_Peripheral_ReadRegister(LIS3DH_DEVICE_ADDRESS,
-                                        LIS3DH_CTRL_REG4,
-                                        &ctrl_reg4);
-    
-    if (error == NO_ERROR)
-    {
-        sprintf(message, "CONTROL REGISTER 4 after overwrite operation: 0x%02X\r\n", ctrl_reg4);
-        UART_Debug_PutString(message); 
-    }
-    else
-    {
-        UART_Debug_PutString("Error occurred during I2C comm to read control register 1\r\n");   
-    }
-    
-    /*      I2C Reading Status Register       */
-    
-    uint8_t status_register; 
-    error = I2C_Peripheral_ReadRegister(LIS3DH_DEVICE_ADDRESS,
-                                        LIS3DH_STATUS_REG,
-                                        &status_register);
-    
-    if (error == NO_ERROR)
-    {
-        sprintf(message, "STATUS REGISTER: 0x%02X\r\n", status_register);
-        UART_Debug_PutString(message); 
-    }
-    else
-    {
-        UART_Debug_PutString("Error occurred during I2C comm to read status register\r\n");   
-    }
     
     
+    uint8_t status_register;
     int16_t OutX,OutY,OutZ;
     uint8_t header = 0xA0;
     uint8_t footer = 0xC0;
     uint8_t OutArray[8]; 
     
-    uint8_t XData[2],YData[2],ZData[2];
+    uint8_t AccData[6]; // Array of the acceleration data
    
     OutArray[0] = header;
     OutArray[7] = footer;
     
     for(;;)
     {
-        CyDelay(10); // we read data at 100 Hz (10ms of delay)
+        //CyDelay(10); // we read data at 100 Hz (10ms of delay)
         
-        error = I2C_Peripheral_ReadRegisterMulti(LIS3DH_DEVICE_ADDRESS,
-                                                LIS3DH_OUT_X_L,
-                                                2,
-                                                &XData[0]);
-        
-        error = I2C_Peripheral_ReadRegisterMulti(LIS3DH_DEVICE_ADDRESS,
-                                                LIS3DH_OUT_Y_L,
-                                                2,
-                                                &YData[0]);
-        
-        error = I2C_Peripheral_ReadRegisterMulti(LIS3DH_DEVICE_ADDRESS,
-                                                LIS3DH_OUT_Z_L,
-                                                2,
-                                                &ZData[0]);
-        
-        
-        
+        //Read of the Status Register
+        error = I2C_Peripheral_ReadRegister(LIS3DH_DEVICE_ADDRESS,
+                                            LIS3DH_STATUS_REG,
+                                            &status_register);
         if(error == NO_ERROR)
         {
-            OutX = (int16)((XData[0] | (XData[1]<<8)))>>6;
-            OutX = OutX*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
-            OutArray[1] = (uint8_t)(OutX & 0xFF);
-            OutArray[2] = (uint8_t)(OutX >> 8);
-            OutY = (int16)((YData[0] | (YData[1]<<8)))>>6;
-            OutY = OutY*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
-            OutArray[3] = (uint8_t)(OutY & 0xFF);
-            OutArray[4] = (uint8_t)(OutY >> 8);
-            OutZ = (int16)((ZData[0] | (ZData[1]<<8)))>>6;
-            OutZ = OutZ*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
-            OutArray[5] = (uint8_t)(OutZ & 0xFF);
-            OutArray[6] = (uint8_t)(OutZ >> 8);
-          
-            UART_Debug_PutArray(OutArray, 8);
-            
-        }
+            if((status_register & 1<<3) == 8) //Control if ZYXDA is set to 1, 
+                                              //in this case new set of data is available
+            {
+                if((status_register & 1<<7) == 128)// Control if ZYXOR is set to 1,
+                                                   // in this case  a new set of 
+                                                   //data has overwritten the previous set
+               {
+                    //The registers of the OUTPUT of X,Y,Z are consecutive so we use a Multi-Read 
+                    error = I2C_Peripheral_ReadRegisterMulti(LIS3DH_DEVICE_ADDRESS,
+                                                          LIS3DH_OUT_X_L,
+                                                          6,
+                                                          &AccData[0]);
+                    
         
+                    if(error == NO_ERROR)
+                    {
+                        OutX = (int16)((AccData[0] | (AccData[1]<<8)))>>6;
+                        OutX = OutX*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
+                        OutArray[1] = (uint8_t)(OutX & 0xFF);
+                        OutArray[2] = (uint8_t)(OutX >> 8);
+                        OutY = (int16)((AccData[2] | (AccData[3]<<8)))>>6;
+                        OutY = OutY*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
+                        OutArray[3] = (uint8_t)(OutY & 0xFF);
+                        OutArray[4] = (uint8_t)(OutY >> 8);
+                        OutZ = (int16)((AccData[4] | (AccData[5]<<8)))>>6;
+                        OutZ = OutZ*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
+                        OutArray[5] = (uint8_t)(OutZ & 0xFF);
+                        OutArray[6] = (uint8_t)(OutZ >> 8);
+          
+                        UART_Debug_PutArray(OutArray, 8);
+                    }
+                }
+            }
+          }
     }
 }
 
