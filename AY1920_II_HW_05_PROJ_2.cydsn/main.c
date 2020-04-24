@@ -43,7 +43,7 @@
 #define LIS3DH_CTRL_REG4 0x23  
 
 // For the normal mode at 100 Hz and ±2.0 g FSR, Hex value is 0x00
-#define LIS3DH_NORMAL_MODE_100HZ_CTRL_REG4 0x80
+#define LIS3DH_NORMAL_MODE_100HZ_CTRL_REG4 0x00
 
 /**
 *   \brief Address of the X-axis acceleration data output LSB register
