@@ -1,1 +1,1 @@
-rx8 [h=A0] @0x @1x @0y @1y @0z @1z [t=C0] 
+rx8 [h=A0] @0AccX @1AccX @0AccY @1AccY @0AccZ @1AccZ [t=C0] 
