@@ -11,7 +11,7 @@
 #include "I2C_Interface.h"
 #include "project.h"
 #include "stdio.h"
-
+#include "InterruptRoutines.h"
 /**
 *   \brief 7-bit I2C address of the slave device.
 */
@@ -43,9 +43,9 @@
 #define LIS3DH_CTRL_REG4 0x23  
 
 /**
-*   \brief Hex value to set High Resolution mode at 100 Hz in the ±4.0 g FSR to the accelerator
+*   \brief Hex value to set High Resolution mode at 100 Hz in the ±4.0 g FSR to the accelerator (BDU =1)
 */
-#define LIS3DH_HIGH_RESOLUTION_MODE_100HZ_CTRL_REG4 0x18
+#define LIS3DH_HIGH_RESOLUTION_MODE_100HZ_CTRL_REG4 0x98
 
 /**
 *   \brief Address of the X-axis acceleration data output LSB register
@@ -190,60 +190,75 @@ int main(void)
     }
    
     uint8_t status_register;
-    int16_t OutX,OutY,OutZ;
+    int16_t OutX,OutY,OutZ;  //int16 values of acceleration
+    int32_t OutX32,OutY32,OutZ32; //int32 values of acceleration after the cast of the floating point
     uint8_t header = 0xA0;
     uint8_t footer = 0xC0;
-    uint8_t OutArray[8]; 
+    
+    uint8_t OutArray[14]; // In this case we have 4 byte for every axis + 1 header +  1 tail
+    float32 AccX,AccY,AccZ; //floating point values in m/s^2
     
     uint8_t AccData[6]; // Array of the acceleration data
    
     OutArray[0] = header;
-    OutArray[7] = footer;
+    OutArray[13] = footer;
+    
+    Timer_Start();  //Timer Start
+    isr_Read_StartEx(Custom_ISR); //Start of the ISR
     
     for(;;)
     {
-        //CyDelay(10); // we read data at 100 Hz (10ms of delay)
-        
-        //Read of the Status Register
-        error = I2C_Peripheral_ReadRegister(LIS3DH_DEVICE_ADDRESS,
-                                            LIS3DH_STATUS_REG,
-                                            &status_register);
-        if(error == NO_ERROR)
-        {
-            if((status_register & 1<<3) == 8) //Control if ZYXDA is set to 1, 
-                                              //in this case new set of data is available
+        if(Flag_Read != 0)  //ISR for read data at every 10ms
+        { 
+            //Read of the Status Register 
+            error = I2C_Peripheral_ReadRegister(LIS3DH_DEVICE_ADDRESS,
+                                                LIS3DH_STATUS_REG,
+                                                &status_register);
+            if(error == NO_ERROR)
             {
-                if((status_register & 1<<7) == 128)// Control if ZYXOR is set to 1,
-                                                   // in this case  a new set of 
-                                                   //data has overwritten the previous set
+                if((status_register & 1<<3) == 8) //Control if ZYXDA is set to 1, 
+                                                  //in this case new set of data is available
                {
                     //The registers of the OUTPUT of X,Y,Z are consecutive so we use a Multi-Read 
                     error = I2C_Peripheral_ReadRegisterMulti(LIS3DH_DEVICE_ADDRESS,
-                                                          LIS3DH_OUT_X_L,
-                                                          6,
-                                                          &AccData[0]);
+                                                             LIS3DH_OUT_X_L,
+                                                             6,
+                                                             &AccData[0]);
                     
-        
                     if(error == NO_ERROR)
                     {
                         OutX = (int16)((AccData[0] | (AccData[1]<<8)))>>4; //We have 12-bit of data
-                        OutX = OutX*2; // Multiply the value for 2 because the sensitivity is 2 mg/digit
-                        OutArray[1] = (uint8_t)(OutX & 0xFF);
-                        OutArray[2] = (uint8_t)(OutX >> 8);
+                        AccX=  OutX*2*9.806*0.001; // Multiply the value for 2 because the sensitivity is 2 mg/digit and 9.806*0.001 m/s^2
+                        OutX32 =  AccX*1000; //Cast the floating point value to an int32 
+                                                   //without loosing information of 3 decimals using the multiplication by 1000
+                        OutArray[1] = (uint8_t)(OutX32 & 0xFF);
+                        OutArray[2] = (uint8_t)(OutX32 >>8);
+                        OutArray[3] = (uint8_t)(OutX32 >>16);
+                        OutArray[4] = (uint8_t)(OutX32 >>24);
+                        
                         OutY = (int16)((AccData[2] | (AccData[3]<<8)))>>4;
-                        OutY = OutY*2; // Multiply the value for  2 because the sensitivity is 2 mg/digit
-                        OutArray[3] = (uint8_t)(OutY & 0xFF);
-                        OutArray[4] = (uint8_t)(OutY >> 8);
+                        AccY = OutY*2*9.806*0.001; // Multiply the value for  2 because the sensitivity is 2 mg/digit and 9.806*0.001 m/s^2
+                        OutY32 = AccY*1000; //Cast the floating point value to an int32 
+                                                  //without loosing information of 3 decimals using the multiplication by 1000  
+                        OutArray[5] = (uint8_t)(OutY32 & 0xFF);
+                        OutArray[6] = (uint8_t)(OutY32 >> 8);
+                        OutArray[7] = (uint8_t)(OutY32 >>16);
+                        OutArray[8] = (uint8_t)(OutY32 >>24);
+                        
                         OutZ = (int16)((AccData[4] | (AccData[5]<<8)))>>4;
-                        OutZ = OutZ*2; // Multiply the value for 2 because the sensitivity is 2 mg/digit
-                        OutArray[5] = (uint8_t)(OutZ & 0xFF);
-                        OutArray[6] = (uint8_t)(OutZ >> 8);
+                        AccZ = OutZ*2*9.806*0.001; // Multiply the value for 2 because the sensitivity is 2 mg/digit and 9.806*0.001 m/s^2
+                        OutZ32 = AccZ*1000;//Cast the floating point value to an int32 
+                                               //without loosing information of 3 decimals using the multiplication by 1000  
+                        OutArray[9] = (uint8_t)(OutZ32 & 0xFF);
+                        OutArray[10] =(uint8_t)(OutZ32 >> 8);
+                        OutArray[11] = (uint8_t)(OutZ32 >>16);
+                        OutArray[12] = (uint8_t)(OutZ32 >>24);
           
-                        UART_Debug_PutArray(OutArray, 8);
+                        UART_Debug_PutArray(OutArray, 14);
                     }
                 }
             }
-          }
+         }
     }
     
     
