@@ -11,7 +11,7 @@
 #include "I2C_Interface.h"
 #include "project.h"
 #include "stdio.h"
-
+#include "InterruptRoutines.h"
 /**
 *   \brief 7-bit I2C address of the slave device.
 */
@@ -42,8 +42,8 @@
 */
 #define LIS3DH_CTRL_REG4 0x23  
 
-// For the normal mode at 100 Hz and ±2.0 g FSR, Hex value is 0x00
-#define LIS3DH_NORMAL_MODE_100HZ_CTRL_REG4 0x00
+// For the normal mode at 100 Hz and ±2.0 g FSR, Hex value is 0x80 (BDU=1)
+#define LIS3DH_NORMAL_MODE_100HZ_CTRL_REG4 0x80
 
 /**
 *   \brief Address of the X-axis acceleration data output LSB register
@@ -64,7 +64,6 @@ int main(void)
 {
     CyGlobalIntEnable; /* Enable global interrupts. */
 
-    /* Place your initialization/startup code here (e.g. MyInst_Start()) */
     I2C_Peripheral_Start();
     UART_Debug_Start();
     
@@ -190,34 +189,33 @@ int main(void)
 
     
     
-    uint8_t status_register;
-    int16_t OutX,OutY,OutZ;
+    uint8_t status_register; 
+    int16_t OutX,OutY,OutZ; //int16 variables for the acceleration output
+    uint8_t AccData[6]; // Array of the acceleration data
+    
     uint8_t header = 0xA0;
     uint8_t footer = 0xC0;
-    uint8_t OutArray[8]; 
     
-    uint8_t AccData[6]; // Array of the acceleration data
-   
+    uint8_t OutArray[8]; // 6 bytes for the Output data + 1 byte for Header + 1 for the footer
     OutArray[0] = header;
     OutArray[7] = footer;
     
+    Timer_Start();  //Timer Start
+    isr_Read_StartEx(Custom_ISR); //Start of the ISR
+    
     for(;;)
     {
-        //CyDelay(10); // we read data at 100 Hz (10ms of delay)
-        
-        //Read of the Status Register
-        error = I2C_Peripheral_ReadRegister(LIS3DH_DEVICE_ADDRESS,
-                                            LIS3DH_STATUS_REG,
-                                            &status_register);
-        if(error == NO_ERROR)
+        if(Flag_Read != 0)  //ISR for read data at every 10ms
         {
-            if((status_register & 1<<3) == 8) //Control if ZYXDA is set to 1, 
-                                              //in this case new set of data is available
+            //Read of the Status Register
+            error = I2C_Peripheral_ReadRegister(LIS3DH_DEVICE_ADDRESS,
+                                                LIS3DH_STATUS_REG,
+                                                &status_register);
+            if(error == NO_ERROR)
             {
-                if((status_register & 1<<7) == 128)// Control if ZYXOR is set to 1,
-                                                   // in this case  a new set of 
-                                                   //data has overwritten the previous set
-               {
+                 if((status_register & 1<<3) == 8) //Control if ZYXDA is set to 1, 
+                                                   //in this case new set of data is available
+                {
                     //The registers of the OUTPUT of X,Y,Z are consecutive so we use a Multi-Read 
                     error = I2C_Peripheral_ReadRegisterMulti(LIS3DH_DEVICE_ADDRESS,
                                                           LIS3DH_OUT_X_L,
@@ -231,20 +229,25 @@ int main(void)
                         OutX = OutX*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
                         OutArray[1] = (uint8_t)(OutX & 0xFF);
                         OutArray[2] = (uint8_t)(OutX >> 8);
+                        
                         OutY = (int16)((AccData[2] | (AccData[3]<<8)))>>6;
                         OutY = OutY*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
                         OutArray[3] = (uint8_t)(OutY & 0xFF);
                         OutArray[4] = (uint8_t)(OutY >> 8);
+                        
                         OutZ = (int16)((AccData[4] | (AccData[5]<<8)))>>6;
                         OutZ = OutZ*4; // Multiply the value for 4 because the sensitivity is 4 mg/digit
                         OutArray[5] = (uint8_t)(OutZ & 0xFF);
                         OutArray[6] = (uint8_t)(OutZ >> 8);
-          
+                        
                         UART_Debug_PutArray(OutArray, 8);
+                        
+                        Flag_Read = 0; 
                     }
                 }
-            }
-          }
+              }
+            
+         }
     }
 }
 
