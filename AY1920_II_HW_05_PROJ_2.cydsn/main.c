@@ -240,9 +240,9 @@ int main(void)
                         OutArray[5] = (uint8_t)(OutZ & 0xFF);
                         OutArray[6] = (uint8_t)(OutZ >> 8);
                         
-                        UART_Debug_PutArray(OutArray, 8);
+                        UART_Debug_PutArray(OutArray, 8); //Send data to Uart (values in [mg])
                         
-                        Flag_Read = 0; 
+                        Flag_Read = 0; //Set Flag ISR_Read to 0
                     }
                 }
               }
