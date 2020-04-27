@@ -66,7 +66,6 @@ int main(void)
 {
     CyGlobalIntEnable; /* Enable global interrupts. */
 
-    /* Place your initialization/startup code here (e.g. MyInst_Start()) */
     I2C_Peripheral_Start();
     UART_Debug_Start();
     
@@ -146,7 +145,7 @@ int main(void)
     /*            I2C Writing                 */
     /******************************************/
     
-        
+      //Write CTRL_REG1  
     UART_Debug_PutString("\r\nWriting new values..\r\n");
     
     if (ctrl_reg1 != LIS3DH_HIGH_RESOLUTION_MODE_100HZ_CTRL_REG1)
@@ -167,6 +166,7 @@ int main(void)
             UART_Debug_PutString("Error occurred during I2C comm to set control register 1\r\n");   
         }
     }
+    //Write CTRL_REG4
     
      UART_Debug_PutString("\r\nWriting new values..\r\n");
     
@@ -192,14 +192,13 @@ int main(void)
     uint8_t status_register;
     int16_t OutX,OutY,OutZ;  //int16 values of acceleration
     int32_t OutX32,OutY32,OutZ32; //int32 values of acceleration after the cast of the floating point
-    uint8_t header = 0xA0;
-    uint8_t footer = 0xC0;
+    float32 AccX,AccY,AccZ; //floating point values in m/s^2
+    uint8_t AccData[6]; // Array of the acceleration data
+    
     
     uint8_t OutArray[14]; // In this case we have 4 byte for every axis + 1 header +  1 tail
-    float32 AccX,AccY,AccZ; //floating point values in m/s^2
-    
-    uint8_t AccData[6]; // Array of the acceleration data
-   
+    uint8_t header = 0xA0;
+    uint8_t footer = 0xC0;
     OutArray[0] = header;
     OutArray[13] = footer;
     
@@ -254,7 +253,9 @@ int main(void)
                         OutArray[11] = (uint8_t)(OutZ32 >>16);
                         OutArray[12] = (uint8_t)(OutZ32 >>24);
           
-                        UART_Debug_PutArray(OutArray, 14);
+                        UART_Debug_PutArray(OutArray, 14);  //Send array to the Uart (values in [m/s^2])
+                        
+                        Flag_Read = 0;  //Set the ISR flag to 0
                     }
                 }
             }
